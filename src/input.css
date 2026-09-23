@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+.box-highlight {
+  background-color: rgb(125 211 252);
+  border-color: rgb(14 165 233);
+  color: rgb(12 74 110);
+  box-shadow: 0 0 0 4px rgb(186 230 253);
+  transform: scale(1.04);
+}
+
+.box-correct {
+  background-color: rgb(187 247 208);
+  border-color: rgb(34 197 94);
+  color: rgb(20 83 45);
+}
+
+.box-wrong {
+  background-color: rgb(254 202 202);
+  border-color: rgb(239 68 68);
+  color: rgb(127 29 29);
+  box-shadow: 0 0 0 4px rgb(254 226 226);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .box-highlight,
+  .box-correct,
+  .box-wrong {
+    transition: none;
+  }
+}

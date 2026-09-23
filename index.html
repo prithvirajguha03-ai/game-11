@@ -1,11 +1,434 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="./src/output.css" rel="stylesheet">
+  <title>Visual Memory Sequence Game</title>
 </head>
-<body>
-    
+<body class="min-h-screen bg-slate-50 text-slate-800 antialiased flex items-center justify-center p-4 select-none">
+  <main class="w-full max-w-lg flex flex-col items-center gap-6 py-6">
+    <header class="text-center">
+      <h1 class="text-2xl font-bold text-slate-700">Memory Sequence</h1>
+      <p class="mt-1 text-sm text-slate-500">Watch the boxes, then repeat the exact order.</p>
+    </header>
+
+    <div class="text-center">
+      <div class="text-lg font-semibold text-slate-700">
+        <span>Level: <span id="level-value">1</span></span>
+        <span class="mx-3 text-slate-300" aria-hidden="true">|</span>
+        <span>Levels Cleared: <span id="cleared-value">0</span></span>
+      </div>
+      <p id="prompt" class="mt-1 text-sm text-slate-500" aria-live="polite">Get ready...</p>
+    </div>
+
+    <section id="game-over" class="hidden w-full max-w-sm rounded-2xl bg-rose-50 border border-rose-200 px-8 py-6 text-center">
+      <h2 class="text-2xl font-bold text-rose-600">Game Over</h2>
+      <p id="game-over-text" class="mt-2 text-slate-600"></p>
+      <button id="game-over-restart" class="mt-4 rounded-xl bg-rose-500 px-6 py-2.5 text-white font-medium hover:bg-rose-600 transition-colors cursor-pointer">
+        Restart
+      </button>
+    </section>
+
+    <div id="grid" class="grid w-full max-w-md grid-cols-3 gap-4 sm:gap-5" role="group" aria-label="Memory boxes"></div>
+
+    <div class="flex gap-3">
+      <button id="pause-btn" class="rounded-xl bg-slate-800 px-6 py-2.5 text-white font-medium hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+        Pause
+      </button>
+      <button id="restart-btn" class="rounded-xl border border-slate-300 bg-white px-6 py-2.5 text-slate-700 font-medium hover:bg-slate-100 transition-colors cursor-pointer">
+        Restart
+      </button>
+    </div>
+
+    <footer class="text-xs text-slate-400">Tip: remember the exact order of the highlighted boxes.</footer>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var STATE = {
+        READY: 'READY',
+        SHOWING_SEQUENCE: 'SHOWING_SEQUENCE',
+        PLAYER_INPUT: 'PLAYER_INPUT',
+        PAUSED: 'PAUSED',
+        GAME_OVER: 'GAME_OVER'
+      };
+
+      var BOX_COUNT = 6;
+      var BOX_MS = 1000;
+      var GAP_MS = 350;
+      var NEXT_LEVEL_DELAY_MS = 400;
+      var GAME_OVER_DELAY_MS = 500;
+      var HIGHLIGHT_CLASS = 'box-highlight';
+      var CORRECT_CLASS = 'box-correct';
+      var WRONG_CLASS = 'box-wrong';
+
+      var grid = document.getElementById('grid');
+      var levelValue = document.getElementById('level-value');
+      var clearedValue = document.getElementById('cleared-value');
+      var prompt = document.getElementById('prompt');
+      var pauseBtn = document.getElementById('pause-btn');
+      var restartBtn = document.getElementById('restart-btn');
+      var gameOverSec = document.getElementById('game-over');
+      var gameOverText = document.getElementById('game-over-text');
+      var gameOverRestart = document.getElementById('game-over-restart');
+
+      var boxes = [];
+      for (var i = 1; i <= BOX_COUNT; i++) {
+        (function (n) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.dataset.index = String(n);
+          btn.id = 'box-' + n;
+          btn.className =
+            'box flex aspect-square w-full items-center justify-center rounded-2xl ' +
+            'border-2 border-slate-200 bg-white text-3xl font-bold text-slate-400 ' +
+            'shadow-sm transition-all duration-200 ease-out ' +
+            'cursor-pointer touch-manipulation outline-none ' +
+            'hover:border-sky-400 focus-visible:ring-4 focus-visible:ring-sky-200 ' +
+            'active:scale-95 disabled:cursor-default';
+          btn.textContent = String(n);
+          btn.setAttribute('aria-label', 'Box ' + n);
+          btn.addEventListener('click', function () { onBoxClick(n); });
+          grid.appendChild(btn);
+          boxes.push(btn);
+        })(i);
+      }
+
+      // ---- core state ----
+      var state = STATE.READY;
+      var level = 1;
+      var levelsCleared = 0;
+      var sequence = [];
+      var inputPos = 0;
+      var inputBlocked = false;
+
+      // playback state
+      var playToken = 0;
+      var playTimer = null;
+      var playIndex = 0;
+      var playPhase = 'show'; // 'show' | 'between'
+      var playRemaining = 0;
+      var phaseStartedAt = 0;
+      var phaseDuration = 0;
+
+      // transition state
+      var transitionTimer = null;
+      var pendingMode = null;   // 'next-level' | 'game-over' (armed)
+      var suspendMode = null;   // mode captured across a pause
+
+      // resume handling
+      var resumeKind = 'input'; // 'playback' | 'input'
+
+      // ---------- helpers ----------
+
+      function setButtonsEnabled(enabled) {
+        for (var i = 0; i < boxes.length; i++) {
+          boxes[i].disabled = !enabled;
+          boxes[i].setAttribute('aria-disabled', enabled ? 'false' : 'true');
+        }
+      }
+
+      function clearFlavors() {
+        for (var i = 0; i < boxes.length; i++) {
+          boxes[i].classList.remove(HIGHLIGHT_CLASS, CORRECT_CLASS, WRONG_CLASS);
+        }
+      }
+
+      function updateDisplays() {
+        levelValue.textContent = String(level);
+        clearedValue.textContent = String(levelsCleared);
+      }
+
+      function setPrompt(text) {
+        prompt.textContent = text;
+      }
+
+      function stopPlayTimers() {
+        if (playTimer) {
+          clearTimeout(playTimer);
+          playTimer = null;
+        }
+      }
+
+      function cancelTransition() {
+        if (transitionTimer) {
+          clearTimeout(transitionTimer);
+          transitionTimer = null;
+        }
+        pendingMode = null;
+      }
+
+      function armMode(mode, delay) {
+        cancelTransition();
+        pendingMode = mode;
+        transitionTimer = setTimeout(function () {
+          transitionTimer = null;
+          if (state === STATE.PAUSED) return;
+          pendingMode = null;
+          if (mode === 'next-level') {
+            if (state === STATE.PLAYER_INPUT) startLevel();
+          } else if (mode === 'game-over') {
+            if (state === STATE.PLAYER_INPUT) doGameOver();
+          }
+        }, delay);
+      }
+
+      function highlight(boxIndex) {
+        boxes[boxIndex - 1].classList.add(HIGHLIGHT_CLASS);
+      }
+
+      function clearHighlight(boxIndex) {
+        boxes[boxIndex - 1].classList.remove(HIGHLIGHT_CLASS);
+      }
+
+      // ---------- state transitions ----------
+
+      function enterShowingSequence() {
+        state = STATE.SHOWING_SEQUENCE;
+        inputPos = 0;
+        inputBlocked = false;
+        setButtonsEnabled(false);
+        pauseBtn.disabled = false;
+        pauseBtn.textContent = 'Pause';
+        setPrompt('Watch carefully...');
+      }
+
+      function enterPlayerInput() {
+        state = STATE.PLAYER_INPUT;
+        inputPos = 0;
+        inputBlocked = false;
+        clearFlavors();
+        setButtonsEnabled(true);
+        pauseBtn.disabled = false;
+        pauseBtn.textContent = 'Pause';
+        updateInputPrompt();
+      }
+
+      function resumePlayerInput() {
+        state = STATE.PLAYER_INPUT;
+        setButtonsEnabled(true);
+        pauseBtn.disabled = false;
+        pauseBtn.textContent = 'Pause';
+        updateInputPrompt();
+      }
+
+      function updateInputPrompt() {
+        setPrompt('Your turn - click box ' + (inputPos + 1) + ' of ' + sequence.length);
+      }
+
+      function enterPaused() {
+        state = STATE.PAUSED;
+        setButtonsEnabled(false);
+        pauseBtn.disabled = false;
+        pauseBtn.textContent = 'Resume';
+        setPrompt('Paused. Press Resume to continue.');
+      }
+
+      function doGameOver() {
+        state = STATE.GAME_OVER;
+        inputBlocked = true;
+        playToken++;
+        stopPlayTimers();
+        cancelTransition();
+        setButtonsEnabled(false);
+        pauseBtn.disabled = true;
+        pauseBtn.textContent = 'Pause';
+        setPrompt('');
+        gameOverText.textContent =
+          'Highest level completed: ' + levelsCleared +
+          (levelsCleared === 1 ? ' level' : ' levels') + '.';
+        gameOverSec.classList.remove('hidden');
+      }
+
+      // ---------- sequence generation & playback ----------
+
+      function generateSequence() {
+        var seq = [];
+        for (var i = 0; i < level; i++) {
+          seq.push(Math.floor(Math.random() * BOX_COUNT) + 1);
+        }
+        return seq;
+      }
+
+      function startLevel() {
+        stopPlayTimers();
+        cancelTransition();
+        playToken++;
+        sequence = generateSequence();
+        playIndex = 0;
+        playPhase = 'show';
+        playRemaining = 0;
+        phaseStartedAt = 0;
+        phaseDuration = 0;
+        resumeKind = 'playback';
+        clearFlavors();
+        gameOverSec.classList.add('hidden');
+        updateDisplays();
+        enterShowingSequence();
+        playbackTick(playToken);
+      }
+
+      function playbackTick(tok) {
+        if (tok !== playToken) return;
+        if (state !== STATE.SHOWING_SEQUENCE) return;
+
+        if (playIndex >= sequence.length) {
+          enterPlayerInput();
+          return;
+        }
+
+        if (playPhase === 'show') {
+          var boxIndex = sequence[playIndex];
+          highlight(boxIndex);
+          var showMs = playRemaining > 0 ? playRemaining : BOX_MS;
+          playRemaining = 0;
+          phaseStartedAt = Date.now();
+          phaseDuration = showMs;
+          playTimer = setTimeout(function () {
+            if (tok !== playToken) return;
+            clearHighlight(boxIndex);
+            playPhase = 'between';
+            playbackTick(tok);
+          }, showMs);
+        } else {
+          var waitMs = playRemaining > 0 ? playRemaining : GAP_MS;
+          playRemaining = 0;
+          phaseStartedAt = Date.now();
+          phaseDuration = waitMs;
+          playTimer = setTimeout(function () {
+            if (tok !== playToken) return;
+            playPhase = 'show';
+            playIndex++;
+            playbackTick(tok);
+          }, waitMs);
+        }
+      }
+
+      // ---------- player input ----------
+
+      function onBoxClick(n) {
+        if (state !== STATE.PLAYER_INPUT) return;
+        if (inputBlocked) return;
+
+        var expected = sequence[inputPos];
+        if (n === expected) {
+          clearFlavors();
+          boxes[n - 1].classList.add(CORRECT_CLASS);
+          inputPos++;
+          if (inputPos >= sequence.length) {
+            inputBlocked = true;
+            setButtonsEnabled(false);
+            clearFlavors();
+            boxes[n - 1].classList.add(CORRECT_CLASS);
+            levelsCleared++;
+            level++;
+            updateDisplays();
+            setPrompt('Great! Level ' + (level - 1) + ' cleared.');
+            armMode('next-level', NEXT_LEVEL_DELAY_MS);
+          } else {
+            updateInputPrompt();
+          }
+        } else {
+          inputBlocked = true;
+          setButtonsEnabled(false);
+          clearFlavors();
+          boxes[n - 1].classList.add(WRONG_CLASS);
+          boxes[expected - 1].classList.add(CORRECT_CLASS);
+          setPrompt('Not quite - that was box ' + expected + '.');
+          armMode('game-over', GAME_OVER_DELAY_MS);
+        }
+      }
+
+      // ---------- pause / resume ----------
+
+      function pauseGame() {
+        if (state !== STATE.SHOWING_SEQUENCE && state !== STATE.PLAYER_INPUT) return;
+
+        if (state === STATE.SHOWING_SEQUENCE) {
+          resumeKind = 'playback';
+          var elapsed = phaseStartedAt ? Date.now() - phaseStartedAt : 0;
+          var remaining = phaseDuration - elapsed;
+          if (remaining < 0) remaining = 0;
+          playRemaining = remaining;
+          stopPlayTimers();
+          phaseStartedAt = 0;
+          phaseDuration = 0;
+          suspendMode = null;
+        } else {
+          resumeKind = 'input';
+          if (pendingMode) {
+            suspendMode = pendingMode;
+            cancelTransition();
+          } else {
+            suspendMode = null;
+          }
+        }
+        enterPaused();
+      }
+
+      function resumeGame() {
+        if (state !== STATE.PAUSED) return;
+
+        if (suspendMode) {
+          var m = suspendMode;
+          suspendMode = null;
+          if (m === 'next-level') {
+            startLevel();
+          } else if (m === 'game-over') {
+            doGameOver();
+          }
+          return;
+        }
+
+        if (resumeKind === 'playback') {
+          enterShowingSequence();
+          playbackTick(playToken);
+        } else {
+          resumePlayerInput();
+        }
+      }
+
+      // ---------- restart ----------
+
+      function restart() {
+        playToken++;
+        stopPlayTimers();
+        cancelTransition();
+        suspendMode = null;
+        pendingMode = null;
+        inputPos = 0;
+        inputBlocked = false;
+        level = 1;
+        levelsCleared = 0;
+        levelValue.textContent = '1';
+        clearedValue.textContent = '0';
+        gameOverSec.classList.add('hidden');
+        clearFlavors();
+        setButtonsEnabled(false);
+        pauseBtn.disabled = false;
+        pauseBtn.textContent = 'Pause';
+        state = STATE.READY;
+        startLevel();
+      }
+
+      // ---------- wire up ----------
+
+      pauseBtn.addEventListener('click', function () {
+        if (state === STATE.PAUSED) {
+          resumeGame();
+        } else {
+          pauseGame();
+        }
+      });
+
+      restartBtn.addEventListener('click', restart);
+      gameOverRestart.addEventListener('click', restart);
+
+      restart();
+    })();
+  </script>
 </body>
 </html>

@@ -7,43 +7,90 @@
   <title>Visual Memory Sequence Game</title>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-800 antialiased flex items-center justify-center p-4 select-none">
-  <main class="w-full max-w-lg flex flex-col items-center gap-6 py-6">
-    <header class="text-center">
-      <h1 class="text-2xl font-bold text-slate-700">Memory Sequence</h1>
-      <p class="mt-1 text-sm text-slate-500">Watch the boxes, then repeat the exact order.</p>
-    </header>
+  <main class="w-full max-w-3xl flex flex-col items-center py-6">
 
-    <div class="text-center">
-      <div class="text-lg font-semibold text-slate-700">
-        <span>Level: <span id="level-value">1</span></span>
-        <span class="mx-3 text-slate-300" aria-hidden="true">|</span>
-        <span>Levels Cleared: <span id="cleared-value">0</span></span>
+    <!-- Step 1 - introduction -->
+    <section id="start-screen" class="w-full max-w-lg">
+      <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <p class="text-center text-sm font-semibold uppercase tracking-wide text-sky-600">Memory Game</p>
+        <h1 class="mt-2 text-center text-3xl font-bold text-slate-700">Memory Sequence</h1>
+        <p class="mt-3 text-center text-base text-slate-500">Watch the boxes light up, then click them in the same order.</p>
+
+        <ol class="mt-6 space-y-3 text-left">
+          <li class="flex items-start gap-3">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-base font-bold text-sky-700">1</span>
+            <span class="pt-1 text-base text-slate-600">The boxes light up one at a time. Watch carefully.</span>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-base font-bold text-sky-700">2</span>
+            <span class="pt-1 text-base text-slate-600">Your turn - click the boxes in the very same order.</span>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-base font-bold text-sky-700">3</span>
+            <span class="pt-1 text-base text-slate-600">Every round you clear adds one more box to remember.</span>
+          </li>
+        </ol>
+
+        <button id="start-btn" type="button" class="mt-7 min-h-14 w-full cursor-pointer rounded-2xl bg-sky-600 px-8 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-300">
+          Start
+        </button>
+        <p class="mt-3 text-center text-sm text-slate-500">Next you choose how easy or hard you want to play.</p>
       </div>
-      <p id="prompt" class="mt-1 text-sm text-slate-500" aria-live="polite">Get ready...</p>
-    </div>
-
-    <section id="game-over" class="hidden w-full max-w-sm rounded-2xl bg-rose-50 border border-rose-200 px-8 py-6 text-center">
-      <h2 class="text-2xl font-bold text-rose-600">Game Over</h2>
-      <p id="game-over-text" class="mt-2 text-slate-600"></p>
-      <button id="game-over-restart" class="mt-4 rounded-xl bg-rose-500 px-6 py-2.5 text-white font-medium hover:bg-rose-600 transition-colors cursor-pointer">
-        Restart
-      </button>
     </section>
 
-    <div id="grid" class="grid w-full max-w-md grid-cols-3 gap-4 sm:gap-5" role="group" aria-label="Memory boxes"></div>
+    <!-- Step 2 - difficulty (rendered by the shared selector) -->
+    <div id="difficulty-screen" class="hidden w-full"></div>
 
-    <div class="flex gap-3">
-      <button id="pause-btn" class="rounded-xl bg-slate-800 px-6 py-2.5 text-white font-medium hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-        Pause
-      </button>
-      <button id="restart-btn" class="rounded-xl border border-slate-300 bg-white px-6 py-2.5 text-slate-700 font-medium hover:bg-slate-100 transition-colors cursor-pointer">
-        Restart
-      </button>
+    <!-- Step 3 - gameplay -->
+    <div id="game-screen" class="hidden w-full max-w-lg flex flex-col items-center gap-6 focus:outline-none" tabindex="-1">
+      <header class="text-center">
+        <h1 class="text-2xl font-bold text-slate-700">Memory Sequence</h1>
+        <p class="mt-1 text-sm text-slate-500">Watch the boxes, then repeat the exact order.</p>
+      </header>
+
+      <div class="text-center">
+        <div class="text-lg font-semibold text-slate-700">
+          <span>Level: <span id="level-value">1</span></span>
+          <span class="mx-3 text-slate-300" aria-hidden="true">|</span>
+          <span>Levels Cleared: <span id="cleared-value">0</span></span>
+          <span id="lives-wrap" class="hidden"><span class="mx-3 text-slate-300" aria-hidden="true">|</span><span>Tries left: <span id="lives-value">3</span></span></span>
+        </div>
+        <p id="prompt" class="mt-1 text-sm text-slate-500" aria-live="polite">Get ready...</p>
+      </div>
+
+      <section id="game-over" class="hidden w-full max-w-sm rounded-2xl bg-rose-50 border border-rose-200 px-8 py-6 text-center">
+        <h2 class="text-2xl font-bold text-rose-600">Game Over</h2>
+        <p id="game-over-text" class="mt-2 text-slate-600"></p>
+        <p id="game-over-difficulty" class="mt-1 text-sm text-slate-500"></p>
+        <button id="game-over-restart" class="mt-4 w-full rounded-xl bg-rose-500 px-6 py-3 text-white font-medium hover:bg-rose-600 transition-colors cursor-pointer">
+          Restart
+        </button>
+        <button id="game-over-difficulty-btn" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-6 py-3 text-slate-700 font-medium hover:bg-slate-100 transition-colors cursor-pointer">
+          Change Difficulty
+        </button>
+      </section>
+
+      <div id="grid" class="grid w-full max-w-md grid-cols-3 gap-4 sm:gap-5" role="group" aria-label="Memory boxes"></div>
+
+      <div class="flex gap-3">
+        <button id="pause-btn" class="rounded-xl bg-slate-800 px-6 py-2.5 text-white font-medium hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+          Pause
+        </button>
+        <button id="restart-btn" class="rounded-xl border border-slate-300 bg-white px-6 py-2.5 text-slate-700 font-medium hover:bg-slate-100 transition-colors cursor-pointer">
+          Restart
+        </button>
+      </div>
+
+      <footer class="text-center text-sm text-slate-500">
+        <p>Difficulty: <span id="difficulty-value" class="font-semibold text-slate-600">Normal</span></p>
+        <p class="mt-1 text-xs text-slate-400">Tip: remember the exact order of the highlighted boxes.</p>
+      </footer>
     </div>
-
-    <footer class="text-xs text-slate-400">Tip: remember the exact order of the highlighted boxes.</footer>
   </main>
 
+  <script src="./src/js/difficulty.js"></script>
+  <script src="./src/js/difficulty-selector.js"></script>
+  <script src="./src/js/game-config.js"></script>
   <script>
     (function () {
       'use strict';
@@ -56,46 +103,47 @@
         GAME_OVER: 'GAME_OVER'
       };
 
-      var BOX_COUNT = 6;
-      var BOX_MS = 1000;
-      var GAP_MS = 350;
+      var GAME_ID = MemorySequenceGame.id;
       var NEXT_LEVEL_DELAY_MS = 400;
+      var RETRY_DELAY_MS = 1200;
       var GAME_OVER_DELAY_MS = 500;
       var HIGHLIGHT_CLASS = 'box-highlight';
       var CORRECT_CLASS = 'box-correct';
       var WRONG_CLASS = 'box-wrong';
+      var BOX_CLASS =
+        'box flex aspect-square w-full items-center justify-center rounded-2xl ' +
+        'border-2 border-slate-200 bg-white text-3xl font-bold text-slate-400 ' +
+        'shadow-sm transition-all duration-200 ease-out ' +
+        'cursor-pointer touch-manipulation outline-none ' +
+        'hover:border-sky-400 focus-visible:ring-4 focus-visible:ring-sky-200 ' +
+        'active:scale-95 disabled:cursor-default';
 
+      var startScreen = document.getElementById('start-screen');
+      var difficultyScreen = document.getElementById('difficulty-screen');
+      var gameScreen = document.getElementById('game-screen');
+      var startBtn = document.getElementById('start-btn');
       var grid = document.getElementById('grid');
       var levelValue = document.getElementById('level-value');
       var clearedValue = document.getElementById('cleared-value');
+      var livesWrap = document.getElementById('lives-wrap');
+      var livesValue = document.getElementById('lives-value');
+      var difficultyValue = document.getElementById('difficulty-value');
       var prompt = document.getElementById('prompt');
       var pauseBtn = document.getElementById('pause-btn');
       var restartBtn = document.getElementById('restart-btn');
       var gameOverSec = document.getElementById('game-over');
       var gameOverText = document.getElementById('game-over-text');
+      var gameOverDifficulty = document.getElementById('game-over-difficulty');
       var gameOverRestart = document.getElementById('game-over-restart');
+      var gameOverDifficultyBtn = document.getElementById('game-over-difficulty-btn');
 
+      var selector = null;
       var boxes = [];
-      for (var i = 1; i <= BOX_COUNT; i++) {
-        (function (n) {
-          var btn = document.createElement('button');
-          btn.type = 'button';
-          btn.dataset.index = String(n);
-          btn.id = 'box-' + n;
-          btn.className =
-            'box flex aspect-square w-full items-center justify-center rounded-2xl ' +
-            'border-2 border-slate-200 bg-white text-3xl font-bold text-slate-400 ' +
-            'shadow-sm transition-all duration-200 ease-out ' +
-            'cursor-pointer touch-manipulation outline-none ' +
-            'hover:border-sky-400 focus-visible:ring-4 focus-visible:ring-sky-200 ' +
-            'active:scale-95 disabled:cursor-default';
-          btn.textContent = String(n);
-          btn.setAttribute('aria-label', 'Box ' + n);
-          btn.addEventListener('click', function () { onBoxClick(n); });
-          grid.appendChild(btn);
-          boxes.push(btn);
-        })(i);
-      }
+
+      // ---- difficulty driven state (filled in by startGame) ----
+      var session = null;
+      var config = null;
+      var livesLeft = 1;
 
       // ---- core state ----
       var state = STATE.READY;
@@ -116,11 +164,79 @@
 
       // transition state
       var transitionTimer = null;
-      var pendingMode = null;   // 'next-level' | 'game-over' (armed)
+      var pendingMode = null;   // 'next-level' | 'retry' | 'game-over' (armed)
       var suspendMode = null;   // mode captured across a pause
 
       // resume handling
       var resumeKind = 'input'; // 'playback' | 'input'
+
+      // ---------- screens ----------
+
+      // Nothing may keep running in the background once we leave the board.
+      function stopRun() {
+        playToken++;
+        stopPlayTimers();
+        cancelTransition();
+        inputBlocked = true;
+        setButtonsEnabled(false);
+      }
+
+      function showScreen(target) {
+        if (target !== gameScreen) stopRun();
+        startScreen.classList.add('hidden');
+        difficultyScreen.classList.add('hidden');
+        gameScreen.classList.add('hidden');
+        target.classList.remove('hidden');
+      }
+
+      function showStart() {
+        showScreen(startScreen);
+        startBtn.focus();
+      }
+
+      function showDifficulty() {
+        showScreen(difficultyScreen);
+        selector.open(session ? session.difficulty : GameDifficulty.fromQueryString(window.location.search));
+      }
+
+      // The game only exists once a difficulty has been chosen.
+      function startGame(difficulty) {
+        var nextSession = GameDifficulty.createSession(GAME_ID, difficulty);
+        var profile = GameDifficulty.getConfig(GAME_ID, nextSession.difficulty);
+        if (!profile) return;
+
+        session = nextSession;
+        config = profile;
+        difficultyValue.textContent = config.label;
+        buildBoxes();
+        selector.close();
+        showScreen(gameScreen);
+        restart();
+        gameScreen.focus();
+      }
+
+      // ---------- board ----------
+
+      function buildBoxes() {
+        grid.textContent = '';
+        boxes = [];
+        for (var i = 1; i <= config.boxCount; i++) {
+          (function (n) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.dataset.index = String(n);
+            btn.id = 'box-' + n;
+            btn.className = BOX_CLASS;
+            btn.textContent = String(n);
+            btn.setAttribute('aria-label', 'Box ' + n);
+            btn.addEventListener('click', function () { onBoxClick(n); });
+            grid.appendChild(btn);
+            boxes.push(btn);
+          })(i);
+        }
+        grid.style.gridTemplateColumns = 'repeat(' + config.gridColumns + ', minmax(0, 1fr))';
+        setButtonsEnabled(false);
+      }
 
       // ---------- helpers ----------
 
@@ -137,9 +253,21 @@
         }
       }
 
+      function sequenceLength() {
+        return config.startLength + (level - 1) * config.lengthStep;
+      }
+
       function updateDisplays() {
         levelValue.textContent = String(level);
         clearedValue.textContent = String(levelsCleared);
+        if (session) session.setScore(levelsCleared);
+        updateLives();
+      }
+
+      function updateLives() {
+        var showLives = !!config && config.lives > 1;
+        livesWrap.classList.toggle('hidden', !showLives);
+        livesValue.textContent = String(Math.max(livesLeft, 0));
       }
 
       function setPrompt(text) {
@@ -170,6 +298,8 @@
           pendingMode = null;
           if (mode === 'next-level') {
             if (state === STATE.PLAYER_INPUT) startLevel();
+          } else if (mode === 'retry') {
+            if (state === STATE.PLAYER_INPUT) startLevel({ replay: true });
           } else if (mode === 'game-over') {
             if (state === STATE.PLAYER_INPUT) doGameOver();
           }
@@ -236,28 +366,32 @@
         setButtonsEnabled(false);
         pauseBtn.disabled = true;
         pauseBtn.textContent = 'Pause';
+        livesWrap.classList.add('hidden');
         setPrompt('');
         gameOverText.textContent =
           'Highest level completed: ' + levelsCleared +
           (levelsCleared === 1 ? ' level' : ' levels') + '.';
+        gameOverDifficulty.textContent = 'Played on ' + config.label + '.';
         gameOverSec.classList.remove('hidden');
       }
 
       // ---------- sequence generation & playback ----------
 
       function generateSequence() {
+        var length = sequenceLength();
         var seq = [];
-        for (var i = 0; i < level; i++) {
-          seq.push(Math.floor(Math.random() * BOX_COUNT) + 1);
+        for (var i = 0; i < length; i++) {
+          seq.push(Math.floor(Math.random() * config.boxCount) + 1);
         }
         return seq;
       }
 
-      function startLevel() {
+      function startLevel(options) {
+        var replay = !!(options && options.replay);
         stopPlayTimers();
         cancelTransition();
         playToken++;
-        sequence = generateSequence();
+        if (!replay) sequence = generateSequence();
         playIndex = 0;
         playPhase = 'show';
         playRemaining = 0;
@@ -283,7 +417,7 @@
         if (playPhase === 'show') {
           var boxIndex = sequence[playIndex];
           highlight(boxIndex);
-          var showMs = playRemaining > 0 ? playRemaining : BOX_MS;
+          var showMs = playRemaining > 0 ? playRemaining : config.boxMs;
           playRemaining = 0;
           phaseStartedAt = Date.now();
           phaseDuration = showMs;
@@ -294,7 +428,7 @@
             playbackTick(tok);
           }, showMs);
         } else {
-          var waitMs = playRemaining > 0 ? playRemaining : GAP_MS;
+          var waitMs = playRemaining > 0 ? playRemaining : config.gapMs;
           playRemaining = 0;
           phaseStartedAt = Date.now();
           phaseDuration = waitMs;
@@ -337,8 +471,15 @@
           clearFlavors();
           boxes[n - 1].classList.add(WRONG_CLASS);
           boxes[expected - 1].classList.add(CORRECT_CLASS);
-          setPrompt('Not quite - that was box ' + expected + '.');
-          armMode('game-over', GAME_OVER_DELAY_MS);
+          livesLeft--;
+          if (livesLeft > 0) {
+            updateLives();
+            setPrompt('Not quite - that was box ' + expected + '. Let us try that one again.');
+            armMode('retry', RETRY_DELAY_MS);
+          } else {
+            setPrompt('Not quite - that was box ' + expected + '.');
+            armMode('game-over', GAME_OVER_DELAY_MS);
+          }
         }
       }
 
@@ -377,6 +518,8 @@
           suspendMode = null;
           if (m === 'next-level') {
             startLevel();
+          } else if (m === 'retry') {
+            startLevel({ replay: true });
           } else if (m === 'game-over') {
             doGameOver();
           }
@@ -391,7 +534,7 @@
         }
       }
 
-      // ---------- restart ----------
+      // ---------- restart (always the same difficulty) ----------
 
       function restart() {
         playToken++;
@@ -401,8 +544,11 @@
         pendingMode = null;
         inputPos = 0;
         inputBlocked = false;
+        sequence = [];
         level = 1;
         levelsCleared = 0;
+        livesLeft = config.lives;
+        if (session) session.restart();
         levelValue.textContent = '1';
         clearedValue.textContent = '0';
         gameOverSec.classList.add('hidden');
@@ -416,6 +562,9 @@
 
       // ---------- wire up ----------
 
+      startBtn.addEventListener('click', showDifficulty);
+      gameOverDifficultyBtn.addEventListener('click', showDifficulty);
+
       pauseBtn.addEventListener('click', function () {
         if (state === STATE.PAUSED) {
           resumeGame();
@@ -427,7 +576,13 @@
       restartBtn.addEventListener('click', restart);
       gameOverRestart.addEventListener('click', restart);
 
-      restart();
+      selector = DifficultySelector.mount(difficultyScreen, {
+        gameId: GAME_ID,
+        onConfirm: startGame,
+        onBack: showStart
+      });
+
+      showStart();
     })();
   </script>
 </body>
